@@ -1,0 +1,23 @@
+server:
+  host: localhost:9999
+
+pool:
+  MaxWorkers: 100
+  IdleWorkers: 1
+  JobQueueCapacity: 100
+  WorkerIdleTimeSecs: 2
+
+sms:
+  Username: 
+  Pwd: 
+  ApiKey: 
+  Sender: 
+
+fcm:
+  ApiKey: 
+
+email:
+  Host: localhost
+  Port: 2525
+  Username: test
+  Password: test
