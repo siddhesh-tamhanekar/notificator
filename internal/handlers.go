@@ -8,11 +8,19 @@ import (
 	"math/rand"
 	"net/http"
 	"siddhesh-tamhanekar/notificator/pkg/pool"
+	"sync"
 	"time"
 )
 
+var notificationRequestPool *sync.Pool
+
 // SetHandlers set application handlers
 func SetHandlers(s *http.ServeMux) {
+	notificationRequestPool = &sync.Pool{
+		New: func() interface{} {
+			return new(sendManyRequest)
+		},
+	}
 	s.HandleFunc("/json", jsonHandler)
 	s.HandleFunc("/send", sendHandler)
 	s.HandleFunc("/sendMany", sendManyHandler)
@@ -70,7 +78,8 @@ type sendManyRequest struct {
 }
 
 func sendManyHandler(w http.ResponseWriter, req *http.Request) {
-	bodyArr := &sendManyRequest{}
+
+	bodyArr := notificationRequestPool.Get().(*sendManyRequest)
 	if err := parseJSONRequest(req.Body, bodyArr); err != nil {
 		http.Error(w, err.Error(), 500)
 	}
@@ -91,7 +100,8 @@ func sendManyHandler(w http.ResponseWriter, req *http.Request) {
 		results = append(results, result)
 
 	}
-	jsonResponse(w, results)
+	notificationRequestPool.Put(bodyArr)
+	jsonResponse(w, bodyArr)
 }
 
 func sendHandler(w http.ResponseWriter, req *http.Request) {

@@ -20,6 +20,16 @@ func main() {
 	pool.Run()
 
 	server := http.NewServeMux()
+	// server.HandleFunc("/debug/pprof/", pprof.Index)
+	// server.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	// server.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	// server.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	// server.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+	// server.Handle("/debug/pprof/block", pprof.Handler("block"))
+	// server.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+	// server.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+	// server.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
 	// add routes
 	internal.SetHandlers(server)
 
