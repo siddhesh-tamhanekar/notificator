@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"mime/quotedprintable"
+	"net/smtp"
 )
 
 // SMTPEmailSender allows to send email message easitly
@@ -40,16 +41,15 @@ func (e *SMTPEmailSender) Send(to, from, subject, message string) (bool, error) 
 	finalMessage.Close()
 
 	body += "\r\n" + encodedMessage.String()
-	fmt.Println(body)
-	// if err := smtp.SendMail(
-	// 	e.Host+":"+e.Port,
-	// 	smtp.PlainAuth("", e.Username, e.Password, e.Host),
-	// 	from,
-	// 	[]string{to},
-	// 	[]byte(body)); err != nil {
+	if err := smtp.SendMail(
+		e.Host+":"+e.Port,
+		smtp.PlainAuth("", e.Username, e.Password, e.Host),
+		from,
+		[]string{to},
+		[]byte(body)); err != nil {
 
-	// 	return false, err
-	// }
+		return false, err
+	}
 	return true, nil
 
 }

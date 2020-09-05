@@ -81,7 +81,6 @@ func SetEmailNotificationJob(to, from, body, subject string) error {
 			}
 		},
 	}
-	// job.Run()
 	if err := pool.GetInstance().AddJob(job); err != nil {
 		return err
 	}

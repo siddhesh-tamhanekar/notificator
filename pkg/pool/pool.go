@@ -2,9 +2,9 @@ package pool
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"runtime"
-	"sync"
 	"time"
 )
 
@@ -13,9 +13,7 @@ var pool *Pool
 //GetInstance provides single instance of pool
 func GetInstance() *Pool {
 	if pool == nil {
-		pool = &Pool{
-			mutex: &sync.Mutex{},
-		}
+		pool = &Pool{}
 	}
 	return pool
 }
@@ -29,20 +27,18 @@ type Job struct {
 	completedAt time.Time
 }
 
+// Pool provides worker pool implementation
 type Pool struct {
-	MaxWorkers         int
-	IdleWorkers        int
-	runningWorkers     int
-	JobQueueCapacity   int
-	WorkerIdleTimeSecs int
-	jobChannel         chan Job
-	avgRunningTime     int
-	mutex              *sync.Mutex
+	MaxWorkers       int
+	runningWorkers   chan struct{}
+	JobQueueCapacity int
+	avgRunningTime   float64
+	jobProcessed     int
+	jobChannel       chan Job
 }
 
 // AddJob adds the job  into queue.
 func (pool *Pool) AddJob(job Job) error {
-	log.Println("add job start")
 	if len(pool.jobChannel) == pool.JobQueueCapacity {
 		log.Println("job queue was fool let's stop accepting for 1 second")
 		time.Sleep(time.Millisecond * 1000)
@@ -53,85 +49,55 @@ func (pool *Pool) AddJob(job Job) error {
 	}
 	pool.jobChannel <- job
 	log.Println("job added")
-	pool.spawnWorker()
-	log.Println("add job end")
 	return nil
+}
+func (pool *Pool) canSpawn() bool {
+	if len(pool.runningWorkers) >= pool.MaxWorkers {
+		return false
+	}
+	return true
 }
 
 // Run method starts the worker pool
 func (pool *Pool) Run() {
 	pool.jobChannel = make(chan Job, pool.JobQueueCapacity)
-	// lets start ideal workers.
-	for i := 0; i < pool.IdleWorkers; i++ {
-		pool.spawnWorker()
+	pool.runningWorkers = make(chan struct{}, pool.MaxWorkers)
+	for {
+		if pool.canSpawn() == false {
+			fmt.Println("pool max workres reach not able to do job")
+			time.Sleep(time.Second * 1)
+			continue
+		}
+
+		job := <-pool.jobChannel
+		pool.runningWorkers <- struct{}{}
+		go func() {
+			job.startedAt = time.Now()
+			job.Run()
+			job.completedAt = time.Now()
+			<-pool.runningWorkers
+		}()
 	}
+
 }
 
+// Stats provides information about pool and memory usage.
 func (pool *Pool) Stats() interface{} {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
 	return map[string]interface{}{
-		"running Workers":    pool.runningWorkers,
-		"max":                pool.MaxWorkers,
-		"jobs":               len(pool.jobChannel),
-		"current goroutines": runtime.NumGoroutine(),
-		"alloc memory":       bToM(m.Alloc),
-		"total alloc memory": bToM(m.TotalAlloc),
-		"sys memory":         bToM(m.Sys),
-		"num gc":             m.NumGC,
+		"Running Workers":        len(pool.runningWorkers),
+		"Max Workers":            pool.MaxWorkers,
+		"Jobs in the Queue":      len(pool.jobChannel),
+		"current goroutines":     runtime.NumGoroutine(),
+		"Allocated memory":       bToM(m.Alloc),
+		"Total Allocated memory": bToM(m.TotalAlloc),
+		"Sytstem memory":         bToM(m.Sys),
+		"no of times GC Runs":    m.NumGC,
 	}
 }
-func bToM(b uint64) uint64 {
-	return b / 1024
-}
 
-func (pool *Pool) spawnWorker() {
-	log.Println("spawnWorker start")
-	if pool.runningWorkers > pool.MaxWorkers {
-		log.Println("max limit reached cant spawn now")
-		return
-	}
-	if len(pool.jobChannel) <= int(float64(pool.runningWorkers)) && pool.runningWorkers > pool.IdleWorkers {
-		log.Printf("no need to spawn worker as jobs= %d  workers = %d \n", len(pool.jobChannel), int(float64(pool.runningWorkers)))
-		return
-	}
-	log.Println("spawning new worker")
-	go pool.worker(pool.runningWorkers)
-
-	pool.mutex.Lock()
-	pool.runningWorkers++
-	pool.mutex.Unlock()
-	log.Println("spawn worker end")
-}
-
-func (pool *Pool) worker(n int) {
-	log.Printf("Worker %d Started\n", n)
-	i := 0
-	for {
-		i++
-		log.Printf("Worker %d In loop: %d\n", n, i)
-		tick := time.Tick(time.Duration(pool.WorkerIdleTimeSecs) * time.Second)
-		// tick = time.Tick(2 * time.Second)
-
-		select {
-		case job := <-pool.jobChannel:
-			log.Printf("Worker %d Got job \n", n)
-			job.startedAt = time.Now()
-			job.Run()
-			job.completedAt = time.Now()
-			log.Printf("Worker %d Completed Job  \n", n)
-
-			break
-		case <-tick:
-			if pool.runningWorkers > pool.IdleWorkers {
-				log.Printf("Worker %d waited for idle time and no job available so dying.  \n", n)
-				pool.mutex.Lock()
-				pool.runningWorkers--
-				pool.mutex.Unlock()
-				// debug.FreeOSMemory()
-				return
-			}
-		}
-	}
+func bToM(bytes uint64) uint64 {
+	return bytes / 1024
 }

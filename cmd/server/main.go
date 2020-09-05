@@ -13,11 +13,9 @@ func main() {
 	// initialize worker pool
 	pool := pool.GetInstance()
 
-	pool.IdleWorkers = notificator.ConfigInstance().Pool.IdleWorkers
 	pool.JobQueueCapacity = notificator.ConfigInstance().Pool.JobQueueCapacity
 	pool.MaxWorkers = notificator.ConfigInstance().Pool.MaxWorkers
-	pool.WorkerIdleTimeSecs = notificator.ConfigInstance().Pool.WorkerIdleTimeSecs
-	pool.Run()
+	go pool.Run()
 
 	server := http.NewServeMux()
 	// server.HandleFunc("/debug/pprof/", pprof.Index)
@@ -30,6 +28,7 @@ func main() {
 	// server.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
 	// server.Handle("/debug/pprof/heap", pprof.Handler("heap"))
 	// server.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
+
 	// add routes
 	internal.SetHandlers(server)
 
